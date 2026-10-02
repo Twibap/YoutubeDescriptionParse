@@ -1,31 +1,90 @@
 # YoutubeDescriptionParse
 
-Windows 10과 macOS에서 같은 Git 저장소로 개발하는 프로젝트입니다.
+YouTube 재생목록의 영상 설명에서 식당 정보를 추출하는 Python CLI입니다. [이전 대화](https://chatgpt.com/share/6abfb435-a59c-83ee-ad72-2b0e67f33d95)의 요구사항을 반영했습니다. 수집한 설명 원문을 보관하므로 파싱 규칙을 바꿔도 영상을 다시 수집하지 않고 결과를 갱신할 수 있습니다.
 
-현재는 두 운영체제의 공통 저장소 설정을 준비한 단계입니다. 공유 대화의 요구사항을 확보한 뒤 기술 스택과 기능 구현을 이어갑니다. 아직 애플리케이션, 의존성 설치 명령, 빌드 또는 테스트 명령은 없습니다.
+## 시작하기
 
-## 개발 시작
+Windows 10과 macOS에서 Git과 [uv](https://docs.astral.sh/uv/getting-started/installation/)를 설치합니다. Python 버전은 `.python-version`의 3.12.14, 의존성은 `uv.lock`으로 고정합니다. 운영체제별 설치와 기기 간 이동은 [개발 가이드](docs/development.md)를 참고하세요.
 
-Git을 설치한 뒤 Windows에서는 PowerShell, macOS에서는 터미널에서 실행합니다.
+다음 명령은 Windows PowerShell과 macOS 터미널에서 동일합니다.
 
 ```text
 git clone https://github.com/Twibap/YoutubeDescriptionParse.git
 cd YoutubeDescriptionParse
 git config --local core.autocrlf false
-git status
+uv sync --frozen
 ```
 
-VS Code를 사용한다면 이 폴더를 열고 추천된 EditorConfig 확장을 설치합니다. 편집기 설정은 저장소에 포함되어 있습니다.
+`uv sync`가 필요한 Python과 `.venv` 환경을 준비합니다. 아래의 `uv run` 명령에는 가상 환경을 직접 활성화할 필요가 없습니다.
 
-두 컴퓨터 사이의 작업 전환, 줄바꿈 설정, 커밋 형식은 [개발 가이드](docs/development.md)를 참고하세요.
+## 영상 수집과 식당 추출
 
-## 공통 설정
+기본 재생목록은 `PLCNYoGrzVJuUWTlwZ2CH9nfQF08959pIj`입니다. 우선 앞의 세 항목만 대상으로 실행합니다.
 
-- `.editorconfig`: UTF-8, 기본 LF 줄바꿈, 공백 2칸 들여쓰기.
-- `.gitattributes`: Git의 텍스트 줄바꿈 통일. Windows 명령 스크립트(`.bat`, `.cmd`)는 CRLF.
-- `.gitignore`: 운영체제·편집기 임시 파일과 로컬 환경 파일 제외.
-- `.vscode/`: 공통 편집기 설정과 EditorConfig 확장 추천.
+```text
+uv run --frozen youtube-description-parse collect --output-dir data --limit 3
+```
 
-## 이어갈 대화
+재생목록 URL 또는 ID를 `collect` 뒤에 지정할 수도 있습니다. URL에 `&`가 있으면 큰따옴표로 감쌉니다.
 
-[이전 대화](https://chatgpt.com/share/6abfb435-a59c-83ee-ad72-2b0e67f33d95)의 요구사항을 이어갑니다. 링크 내용은 현재 개발 환경의 네트워크 접근 제한으로 아직 읽지 못했습니다.
+```text
+uv run --frozen youtube-description-parse collect PLCNYoGrzVJuUWTlwZ2CH9nfQF08959pIj --output-dir data --limit 3
+```
+
+`--limit 3`은 재생목록의 앞 세 항목을 수집 대상으로 정합니다. 성공한 영상 세 개를 채우는 옵션은 아닙니다. 생략하면 전체 재생목록을 대상으로 합니다. 저장된 영상 메타데이터는 캐시로 재사용하며, `--refresh`를 추가하면 기존 메타데이터도 다시 수집합니다.
+
+```text
+uv run --frozen youtube-description-parse collect --output-dir data --refresh
+```
+
+YouTube 접속 제한이나 봇 확인으로 수집이 실패할 수 있습니다. 개별 영상의 실패 내역은 `collection_errors.jsonl`에서 확인합니다. 네트워크 없이 추출 기능을 확인하려면 포함된 예제를 사용합니다.
+
+```text
+uv run --frozen youtube-description-parse parse --input examples/videos.jsonl --output-dir data/demo
+```
+
+예제는 실제 첫 영상의 설명 핵심 구간과 가상 영상 두 개로 구성되어 있습니다. 기대 결과는 식당 언급 세 건과 검토 한 건입니다.
+
+실제로 수집한 원문도 같은 방식으로 다시 파싱합니다.
+
+```text
+uv run --frozen youtube-description-parse parse --input data/videos.jsonl --output-dir data
+```
+
+## 결과 파일
+
+`collect`는 원문 캐시와 수집 실패 내역을 저장하고, `collect`와 `parse`는 식당 JSONL·CSV·검토 파일을 생성하거나 갱신합니다. `parse`는 입력 원문 파일과 기존 수집 실패 내역을 변경하지 않습니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `videos.jsonl` | 영상 메타데이터와 설명 전체 원문 캐시 |
+| `restaurant_mentions.jsonl` | 식당명·주소·지도 URL과 영상·재생목록 출처 |
+| `restaurants.csv` | 같은 식당 언급을 Excel에서 열기 쉬운 UTF-8 BOM으로 저장 |
+| `parse_review.jsonl` | 해석이 불명확하거나 지원하지 않는 식당 정보 패턴 |
+| `collection_errors.jsonl` | 개별 영상 수집 실패 내역 |
+
+설명 원문은 별도로 보존하고, 식당 결과 파일에는 식당 정보와 출처 필드만 담습니다. 결과의 `mention_id`는 `재생목록ID:영상ID:영상내순서`로 구성되는 출처 식별자입니다. 식당의 영구 ID가 아니며, 같은 식당이 여러 영상에 등장해도 자동 병합하지 않습니다. 주소도 정규화하지 않고 추출한 값을 유지합니다.
+
+같은 `--output-dir`로 여러 재생목록을 수집하면 저장된 원문과 식당 결과가 함께 유지됩니다. 재생목록별로 결과를 나누려면 각각 다른 출력 폴더를 지정합니다.
+
+설명의 `[식당정보]` 표식 뒤에서 식당명, 주소, 지도 URL을 추출합니다. 기본 형태는 다음과 같으며 표식 하나에 여러 식당이 있는 설명, 여러 표식, 한 줄 표기, Markdown 링크도 처리합니다.
+
+```text
+[식당정보]
+노무토모
+서울 송파구 백제고분로39길 22 1층
+https://naver.me/FoEN86nJ
+```
+
+광고·촬영·BGM 등의 구간은 식당 추출 대상에서 제외합니다. 해석이 불명확한 내용은 검토 파일에 남기므로 `parse_review.jsonl`도 함께 확인하세요.
+
+## 개발 확인
+
+```text
+uv run --frozen pytest
+uv run --frozen ruff check .
+uv run --frozen ruff format --check .
+uv build
+```
+
+GitHub Actions는 Windows, macOS, Linux에서 같은 검사를 실행하도록 구성했습니다. 테스트는 오프라인에서 파싱과 수집 흐름을 검증하며, 실제 YouTube 접속 성공 여부는 별도로 확인해야 합니다.
