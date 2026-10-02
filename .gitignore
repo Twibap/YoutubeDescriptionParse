@@ -23,3 +23,14 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 *~
+
+# Python and generated collection results
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+data/
