@@ -9,7 +9,7 @@ description = "YouTube 영상 설명의 식당정보를 출처와 함께 수집�
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  "yt-dlp>=2025.1.26,<2027",
+  "yt-dlp[default,deno]>=2025.1.26,<2027",
   "tqdm>=4.67.1,<5",
 ]
 

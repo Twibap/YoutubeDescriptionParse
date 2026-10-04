@@ -15,7 +15,7 @@ git config --local core.autocrlf false
 uv sync --frozen
 ```
 
-`uv sync`가 필요한 Python과 `.venv` 환경을 준비합니다. 아래의 `uv run` 명령에는 가상 환경을 직접 활성화할 필요가 없습니다.
+`uv sync`가 필요한 Python과 `.venv` 환경을 준비합니다. YouTube 추출에 필요한 Deno와 EJS도 함께 설치하므로 별도의 JavaScript 런타임 설치는 필요하지 않습니다. 아래의 `uv run` 명령에는 가상 환경을 직접 활성화할 필요가 없습니다.
 
 ## 영상 수집과 식당 추출
 
@@ -37,7 +37,26 @@ uv run --frozen youtube-description-parse collect PLCNYoGrzVJuUWTlwZ2CH9nfQF0895
 uv run --frozen youtube-description-parse collect --output-dir data --refresh
 ```
 
-YouTube 접속 제한이나 봇 확인으로 수집이 실패할 수 있습니다. 개별 영상의 실패 내역은 `collection_errors.jsonl`에서 확인합니다. 네트워크 없이 추출 기능을 확인하려면 포함된 예제를 사용합니다.
+YouTube 접속 제한이나 봇 확인으로 수집이 실패할 수 있습니다. 비공개·삭제 등 접근할 수 없는 영상은 실패로 기록하고 다음 영상을 처리합니다. 개별 영상의 실패 내역은 `collection_errors.jsonl`에서 확인합니다. 영상 재생 형식의 선택은 생략하므로, 다운로드 가능한 형식이 없어도 설명을 얻은 공개 영상은 수집할 수 있습니다.
+
+수집 중 표시되는 경고는 다음과 같이 구분합니다.
+
+| 경고 | 의미와 확인 방법 |
+| --- | --- |
+| `unable to extract yt initial data` / `Incomplete data ... re-fetching using API` | 웹페이지의 초기 데이터가 부족해 API로 재시도합니다. 경고 이후 성공할 수 있으며, 실패 여부는 최종 요약과 실패 파일에서 확인합니다. |
+| `No supported JavaScript runtime could be found` | 실행 중인 환경에서 Deno를 찾지 못했습니다. 최신 소스에서 `uv sync --frozen`을 실행하고 아래 명령으로 설치를 확인합니다. |
+| `Private video` | 비공개 영상에 접근할 수 없습니다. 실패 파일에 영상 ID를 남기고 나머지 수집을 계속합니다. |
+
+```text
+uv sync --frozen
+uv run --frozen deno --version
+```
+
+`수집`은 이번 실행에서 새로 저장한 영상, `건너뜀`은 캐시 또는 중복 항목, `실패`는 이번 실행의 수집 오류입니다. `검토 필요`는 저장한 설명을 해석할 때 확인이 필요한 건수이며, 수집 실패와 별개입니다. 경고만으로 설명 누락을 단정하지 말고 검토 파일의 `reason`, `video_id`, `raw_text`를 확인하세요.
+
+이전 버전은 일부 비공개 응답을 빈 설명으로 저장할 수 있었습니다. 이미 저장된 원문은 자동 삭제하지 않으며, `--refresh`로 다시 수집하면 접근 실패가 실패 파일에 기록됩니다. 다시 수집에 실패한 영상의 기존 캐시도 보존합니다.
+
+네트워크 없이 추출 기능을 확인하려면 포함된 예제를 사용합니다.
 
 ```text
 uv run --frozen youtube-description-parse parse --input examples/videos.jsonl --output-dir data/demo

@@ -31,7 +31,13 @@ git pull --ff-only
 uv sync --frozen
 ```
 
-uv가 필요한 Python 버전과 잠금 파일에 맞는 의존성을 준비합니다. `uv run --frozen`을 사용하면 `.venv`를 직접 활성화하지 않아도 됩니다. VS Code에서는 저장소 폴더를 열고 추천된 확장을 설치합니다.
+uv가 필요한 Python 버전과 잠금 파일에 맞는 의존성을 준비합니다. `yt-dlp[default,deno]`의 Deno와 EJS도 각 기기의 `.venv`에 설치되며, yt-dlp가 같은 Python 환경의 런타임을 자동으로 찾습니다. Windows PowerShell, WSL, macOS에서 다음 명령으로 확인할 수 있습니다.
+
+```text
+uv run --frozen deno --version
+```
+
+`uv run --frozen`을 사용하면 `.venv`를 직접 활성화하지 않아도 됩니다. VS Code에서는 저장소 폴더를 열고 추천된 확장을 설치합니다.
 
 각 기기에서 Git 작성자 이름과 이메일도 설정합니다. 기존 설정이 있다면 그대로 사용합니다.
 
