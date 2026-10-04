@@ -81,7 +81,7 @@ class YoutubeMetadataSource:
                 "extract_flat": extract_flat,
                 "noplaylist": noplaylist,
                 "skip_download": True,
-                "ignore_no_formats_error": True,
+                "ignore_no_formats_error": False,
                 "ignoreerrors": False,
                 "quiet": True,
                 "noprogress": True,
@@ -135,7 +135,8 @@ class YoutubeMetadataSource:
         # entry URL의 list 파라미터와 무관하게 항상 영상 한 개만 추출한다.
         video_url = f"https://www.youtube.com/watch?v={entry.video_id}"
         with self._client(extract_flat=False, noplaylist=True) as client:
-            metadata = client.extract_info(video_url, download=False)
+            # 형식 선택은 생략하되 비공개·삭제 등 추출 단계의 접근 오류는 유지한다.
+            metadata = client.extract_info(video_url, download=False, process=False)
 
         if not isinstance(metadata, Mapping) or metadata.get("_type", "video") != "video":
             raise ValueError("YouTube에서 올바른 영상 메타데이터를 받지 못했습니다.")
