@@ -133,3 +133,4 @@ uv build
 ```
 
 GitHub Actions는 Windows, macOS, Linux에서 같은 검사를 실행하도록 구성했습니다. 테스트는 오프라인에서 파싱과 수집 흐름을 검증하며, 실제 YouTube 접속 성공 여부는 별도로 확인해야 합니다.
+테스트 파일별 검증 항목은 [테스트 구성 문서](docs/tests.md)에서 확인할 수 있습니다.
