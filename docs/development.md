@@ -88,6 +88,16 @@ uv build
 
 의존성을 변경할 때는 `uv add` 또는 `uv remove`를 사용하고 `pyproject.toml`과 `uv.lock`을 함께 커밋합니다. 일상적인 설치는 `uv sync --frozen`을 사용합니다.
 
+## 채널 영상 수집
+
+채널의 일반 동영상은 다음 명령으로 전부 수집합니다. PowerShell, WSL, macOS에서 같은 명령을 사용합니다.
+
+```text
+uv run --frozen youtube-description-parse collect "https://www.youtube.com/@kim3meals/videos" --output-dir data/kim3meals
+```
+
+`--limit 3`을 추가하면 앞 세 항목으로 접속을 확인할 수 있습니다. `@핸들`과 채널 기본 URL도 일반 동영상 탭으로 연결하며 Shorts·라이브 탭은 제외합니다. 결과와 중단 후 재개 방법은 [README](../README.md#채널의-일반-동영상-전체-수집)를 참고하세요.
+
 ## 호환 규칙
 
 - 파일 이름과 import 경로의 대소문자를 정확히 맞추고, 대소문자만 다른 파일을 만들지 않습니다.

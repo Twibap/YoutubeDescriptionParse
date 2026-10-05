@@ -1,6 +1,6 @@
 # YoutubeDescriptionParse
 
-YouTube 재생목록의 영상 설명에서 식당 정보를 추출하는 Python CLI입니다. [이전 대화](https://chatgpt.com/share/6abfb435-a59c-83ee-ad72-2b0e67f33d95)의 요구사항을 반영했습니다. 수집한 설명 원문을 보관하므로 파싱 규칙을 바꿔도 영상을 다시 수집하지 않고 결과를 갱신할 수 있습니다.
+YouTube 재생목록과 채널 일반 동영상의 설명에서 식당 정보를 추출하는 Python CLI입니다. [이전 대화](https://chatgpt.com/share/6abfb435-a59c-83ee-ad72-2b0e67f33d95)의 요구사항을 반영했습니다. 수집한 설명 원문을 보관하므로 파싱 규칙을 바꿔도 영상을 다시 수집하지 않고 결과를 갱신할 수 있습니다.
 
 ## 시작하기
 
@@ -69,6 +69,28 @@ uv run --frozen youtube-description-parse parse --input examples/videos.jsonl --
 ```text
 uv run --frozen youtube-description-parse parse --input data/videos.jsonl --output-dir data
 ```
+
+## 채널의 일반 동영상 전체 수집
+
+채널 URL이나 `@핸들`도 `collect`에 지정할 수 있습니다. 다음 명령은 PowerShell, WSL, macOS에서 같으며, `--limit`을 생략하면 `/videos` 탭의 공개된 목록을 끝까지 탐색합니다.
+
+```text
+uv run --frozen youtube-description-parse collect "https://www.youtube.com/@kim3meals/videos" --output-dir data/kim3meals
+```
+
+처음 접속을 확인할 때는 같은 명령에 `--limit 3`을 추가합니다. 짧은 형태도 사용할 수 있습니다.
+
+```text
+uv run --frozen youtube-description-parse collect "@kim3meals" --output-dir data/kim3meals --limit 3
+```
+
+핸들이나 채널 기본 URL도 `/videos`로 연결합니다. Shorts와 라이브 탭은 포함하지 않습니다. `/channel/UC…/videos` 형태도 지원하며, YouTube 목록에서 공개적으로 조회할 수 없는 비공개·삭제 영상까지 찾는 기능은 아닙니다.
+
+중단했다면 같은 명령을 다시 실행합니다. 채널의 고유 UC ID를 캐시 출처로 사용하므로 핸들 URL 대신 UC URL을 입력해도 성공한 영상을 다시 수집하지 않습니다. 채널별 출력 폴더를 사용하면 기존 재생목록 결과와 따로 관리할 수 있습니다.
+
+결과 파일과 CSV 열은 재생목록 수집과 같습니다. 채널 수집의 `playlist_id`에는 호환성을 위해 `channel:UC…` 형태의 출처 ID를 저장합니다. `playlist_index`는 해당 영상을 수집했을 때의 목록 순번입니다. 식당 정보의 `mention_id`도 이 채널 출처 ID를 사용하며 가게나 영상 출처를 자동으로 병합하지 않습니다.
+
+생성된 `data/kim3meals/restaurants.csv`를 Google 내 지도에 가져와 사용할 수 있습니다. 기존 지도를 갱신하려면 레이어에서 CSV를 다시 가져옵니다.
 
 ## 결과 파일
 

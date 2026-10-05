@@ -20,9 +20,9 @@ def _positive_integer(value: str) -> int:
 def _arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="YouTube 영상 설명의 [식당정보] 수집")
     commands = parser.add_subparsers(dest="command", required=True)
-    collect = commands.add_parser("collect", help="재생목록의 영상 메타데이터 수집")
+    collect = commands.add_parser("collect", help="재생목록 또는 채널 일반 동영상 메타데이터 수집")
     collect.add_argument(
-        "playlist", nargs="?", default=DEFAULT_PLAYLIST_ID, help="재생목록 URL 또는 ID"
+        "source", nargs="?", default=DEFAULT_PLAYLIST_ID, help="재생목록 URL·ID 또는 채널 URL·@핸들"
     )
     collect.add_argument("--output-dir", type=Path, default=Path("data"))
     collect.add_argument("--limit", type=_positive_integer, help="앞에서 N개 항목만 대상으로 지정")
@@ -40,11 +40,11 @@ def main(argv: list[str] | None = None) -> int:
             result = reparse(args.input, args.output_dir)
             print(f"식당 언급 {len(result.mentions)}건, 검토 필요 {len(result.reviews)}건")
             return 0
-        # 재생목록 열거는 별도 요청이며 진행 바에는 영상별 처리만 표시한다.
+        # 목록 열거는 별도 요청이며 진행 바에는 영상별 처리만 표시한다.
         with tqdm(desc="영상 처리", unit="영상", file=sys.stderr) as progress:
             summary = collect_playlist(
                 YoutubeMetadataSource(),
-                args.playlist,
+                args.source,
                 args.output_dir,
                 limit=args.limit,
                 refresh=args.refresh,
