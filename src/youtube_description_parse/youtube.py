@@ -1,9 +1,9 @@
-"""영상 파일을 내려받지 않고 YouTube 재생목록과 설명을 가져온다."""
+"""영상 파일 없이 YouTube 재생목록·채널의 일반 영상과 설명을 가져온다."""
 
 import re
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from .models import PlaylistEntry, PlaylistInfo, VideoRecord
 
@@ -11,6 +11,8 @@ DEFAULT_PLAYLIST_ID = "PLCNYoGrzVJuUWTlwZ2CH9nfQF08959pIj"
 
 _PLAYLIST_ID = re.compile(r"(?:(?:PL|UU|FL|LL|RD|OL|UL|PU)[A-Za-z0-9_-]{10,100}|WL|LL)\Z")
 _VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}\Z")
+_CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
+_HANDLE = re.compile(r"@[\w.-]{1,100}\Z")
 _YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}
 
 
@@ -42,6 +44,60 @@ def normalize_playlist(playlist: str) -> tuple[str, str]:
         playlist_id = lists[0]
 
     return playlist_id, f"https://www.youtube.com/playlist?list={playlist_id}"
+
+
+def normalize_channel(channel: str) -> tuple[str | None, str]:
+    """채널 주소를 일반 동영상 탭으로 고정한다. 핸들은 API 응답에서 UC ID를 얻는다."""
+    if not isinstance(channel, str) or not channel.strip():
+        raise ValueError("YouTube 재생목록 또는 채널 주소가 필요합니다.")
+    value = channel.strip()
+    if value.startswith("@"):
+        value = f"https://www.youtube.com/{value}"
+    elif value.startswith(tuple(f"{host}/" for host in _YOUTUBE_HOSTS)):
+        value = f"https://{value}"
+    parsed = urlparse(value)
+    if (
+        parsed.scheme not in {"https", "http"}
+        or parsed.hostname not in _YOUTUBE_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.netloc.lower() != parsed.hostname
+    ):
+        raise ValueError("YouTube 재생목록 또는 올바른 채널 주소를 입력하세요.")
+    parts = unquote(parsed.path).strip("/").split("/")
+    if parts and _HANDLE.fullmatch(parts[0]) and parts[1:] in ([], ["videos"]):
+        return None, f"https://www.youtube.com/{quote(parts[0], safe='@._-')}/videos"
+    if (
+        len(parts) in {2, 3}
+        and parts[0] == "channel"
+        and _CHANNEL_ID.fullmatch(parts[1])
+        and parts[2:] in ([], ["videos"])
+    ):
+        return parts[1], f"https://www.youtube.com/channel/{parts[1]}/videos"
+    raise ValueError("일반 동영상 수집에는 @채널 또는 /channel/UC…/videos 주소를 입력하세요.")
+
+
+def _collection_id(value: str) -> str:
+    if isinstance(value, str) and value.startswith("channel:"):
+        if not _CHANNEL_ID.fullmatch(value.removeprefix("channel:")):
+            raise ValueError("채널 수집 출처의 UC ID가 올바르지 않습니다.")
+        return value
+    return normalize_playlist(value)[0]
+
+
+def _response_channel_id(metadata: Mapping[str, Any], expected: str | None) -> str:
+    channel_id = metadata.get("channel_id")
+    metadata_id = metadata.get("id")
+    if channel_id is None:
+        channel_id = metadata_id
+    if not isinstance(channel_id, str) or not _CHANNEL_ID.fullmatch(channel_id):
+        raise ValueError("채널 메타데이터에 올바른 UC ID가 없습니다.")
+    if isinstance(metadata_id, str) and _CHANNEL_ID.fullmatch(metadata_id):
+        if metadata_id != channel_id:
+            raise ValueError("채널 메타데이터의 id와 channel_id가 다릅니다.")
+    if expected is not None and channel_id != expected:
+        raise ValueError("요청한 채널과 응답의 채널 ID가 다릅니다.")
+    return f"channel:{channel_id}"
 
 
 def _required_text(metadata: Mapping[str, Any], field: str, context: str) -> str:
@@ -92,18 +148,26 @@ class YoutubeMetadataSource:
         )
 
     def iter_playlist(self, playlist: str) -> PlaylistInfo:
-        """재생목록의 영상 목록을 가져와 반환한다. 영상 본문은 따로 조회한다."""
-        playlist_id, playlist_url = normalize_playlist(playlist)
+        """재생목록 또는 채널 일반 동영상 탭을 끝까지 열거한다."""
+        is_channel = False
+        try:
+            playlist_id, playlist_url = normalize_playlist(playlist)
+        except ValueError:
+            playlist_id, playlist_url = normalize_channel(playlist)
+            is_channel = True
         client_context = self._client(extract_flat=True, noplaylist=False)
         try:
             with client_context as client:
                 metadata = client.extract_info(playlist_url, download=False)
         except Exception as error:
-            raise ValueError(f"재생목록 메타데이터를 가져오지 못했습니다: {error}") from error
+            label = "채널" if is_channel else "재생목록"
+            raise ValueError(f"{label} 메타데이터를 가져오지 못했습니다: {error}") from error
 
         if not isinstance(metadata, Mapping) or metadata.get("_type") != "playlist":
             raise ValueError("YouTube에서 올바른 재생목록 메타데이터를 받지 못했습니다.")
-        if metadata.get("id") != playlist_id:
+        if is_channel:
+            playlist_id = _response_channel_id(metadata, playlist_id)
+        elif metadata.get("id") != playlist_id:
             raise ValueError("요청한 재생목록과 응답의 재생목록 ID가 다릅니다.")
 
         raw_entries = metadata.get("entries")
@@ -129,7 +193,7 @@ class YoutubeMetadataSource:
 
     def get_video(self, entry: PlaylistEntry, playlist_id: str) -> VideoRecord:
         """개별 영상의 원문 설명을 조회한다. 추출 오류는 호출자가 기록한다."""
-        playlist_id, _ = normalize_playlist(playlist_id)
+        playlist_id = _collection_id(playlist_id)
         if not isinstance(entry.video_id, str) or not _VIDEO_ID.fullmatch(entry.video_id):
             raise ValueError("올바른 YouTube 영상 ID가 필요합니다.")
         # entry URL의 list 파라미터와 무관하게 항상 영상 한 개만 추출한다.
